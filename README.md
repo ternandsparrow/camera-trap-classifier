@@ -1,24 +1,6 @@
 # camera-trap-classifier
 
-## Project setup
-```
-yarn install
-```
+A proof of concept that uses a TeachableMachine/TensorFlow.js machine learning
+model to classify photos from a camera trap.
 
-### Compiles and hot-reloads for development
-```
-yarn serve
-```
-
-### Compiles and minifies for production
-```
-yarn build
-```
-
-### Lints and fixes files
-```
-yarn lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+This project is running at http//cameratrap.environmentalmonitoringgroup.com.au.

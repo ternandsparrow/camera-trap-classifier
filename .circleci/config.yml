@@ -1,0 +1,115 @@
+version: 2.1
+
+executors:
+  default-executor:
+    docker:
+      - image: circleci/node:10-browsers
+
+jobs:
+  install-dependencies:
+    executor: default-executor
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v2-deps-{{ checksum "yarn.lock" }}
+            - v2-deps
+
+      - run:
+          name: 'Install dependencies'
+          command: yarn install --frozen-lockfile
+
+      - save_cache:
+          paths:
+            - ~/.cache/yarn
+          key: v2-deps-{{ checksum "yarn.lock" }}
+
+      - persist_to_workspace:
+          root: .
+          paths: .
+
+  check-linter:
+    executor: default-executor
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: 'Run linter'
+          command: yarn lint
+
+  build:
+    executor: default-executor
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: 'Build prod'
+          command: |
+            export NODE_ENV=production
+            yarn build
+      - persist_to_workspace:
+          root: .
+          paths: .
+
+  deploy-prod:
+    docker:
+      - image: circleci/node:10-browsers
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: 'Sync to S3 bucket'
+          command: |
+            cd dist/
+            aws s3 sync --exclude "*.map" --delete --acl public-read . s3://${PROD_S3_BUCKET:?}
+
+  deploy-dev:
+    docker:
+      - image: circleci/node:10-browsers
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: 'Sync to S3 bucket'
+          command: |
+            cd dist/
+            aws s3 sync --exclude "*.map" --delete --acl public-read . s3://${DEV_S3_BUCKET:?}
+
+workflows:
+  version: 2
+  build-and-deploy-prod:
+    jobs:
+      - install-dependencies:
+          filters:
+            branches:
+              only: master # dependent jobs are controlled by this
+      - check-linter:
+          requires:
+            - install-dependencies
+      - build:
+          requires:
+            - check-linter
+      - deploy-prod:
+          requires:
+            - build
+
+  build-everything-and-deploy-dev:
+    jobs:
+      - install-dependencies:
+          filters:
+            branches:
+              ignore: # dependent jobs are controlled by this
+                - master
+      - check-linter:
+          requires:
+            - install-dependencies
+      - build:
+          requires:
+            - check-linter
+          filters:
+            branches:
+              only: develop # only build and deploy this branch
+      - deploy-dev:
+          requires:
+            - build
